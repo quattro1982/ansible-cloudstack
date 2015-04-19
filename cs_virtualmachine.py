@@ -20,82 +20,72 @@
 
 DOCUMENTATION = '''
 ---
-module: cloudstack_vm
-short_description: Create, start, scale, restart, stop and destroy virtual machines on Apache CloudStack based clouds.
+module: cs_virtualmachine
+short_description: Manages virtual machines on Apache CloudStack based clouds.
 description:
-    - Manage virtual machines on Apache CloudStack, Citrix CloudPlatform and Exoscale. Existing virtual machines will be scaled if service offering is different by stopping and starting the virtual machine.
-    - Credentials can be stored locally in C($HOME/.cloudstack.ini) instead of using C(api_url), C(api_key), C(api_secret), C(api_http_method), see https://github.com/exoscale/cs on which this module depends on.
-    - This module supports check mode.
-version_added: '1.9'
+    - Create, start, restart, stop and destroy on Apache CloudStack, Citrix CloudPlatform and Exoscale.
+    - Existing virtual machines will be scaled if service offering is different by stopping and starting the virtual machine.
+version_added: '2.0'
+author: René Moser
 options:
   name:
     description:
       - Name of the virtual machine. Name can only contain ASCII letters. Either C(name) or C(display_name) is required.
     required: false
     default: null
-    aliases: []
   display_name:
     description:
       - Custom display name of the virtual machine. Either C(name) or C(display_name) is required.
     required: false
     default: null
-    aliases: []
   group:
     description:
       - Group in where the new virtual machine should be in.
     required: false
     default: null
-    aliases: []
   state:
     description:
       - State of the virtual machine.
     required: false
     default: 'present'
     choices: [ 'created', 'started', 'running', 'booted', 'stopped', 'halted', 'restarted', 'rebooted', 'present', 'absent', 'destroyed', 'expunged' ]
-    aliases: []
   service_offering:
     description:
       - Name or id of the service offering of the new virtual machine. If not set, first found service offering is used.
     required: false
     default: null
-    aliases: []
   template:
     description:
       - Name or id of the template to be used for creating the new virtual machine. Required when using C(state=created). Mutually exclusive with C(ISO) option.
     required: false
     default: null
-    aliases: []
   iso:
     description:
       - Name or id of the ISO to be used for creating the new virtual machine. Required when using C(state=created). Mutually exclusive with C(template) option.
     required: false
     default: null
-    aliases: []
   hypervisor:
     description:
       - Name the hypervisor to be used for creating the new virtual machine. Relevant when using C(state=created) and option C(ISO) is used. If not set, first found hypervisor will be used.
     required: false
     default: null
     choices: [ 'KVM', 'VMware', 'BareMetal', 'XenServer', 'LXC', 'HyperV', 'UCS', 'OVM' ]
-    aliases: []
   networks:
     description:
       - List of networks to use for the new virtual machine.
     required: false
     default: []
-    aliases: []
+    aliases: [ 'network' ]
   disk_offering:
     description:
       - Name of the disk offering to be used.
     required: false
     default: null
-    aliases: []
   disk_size:
     description:
       - Disk size in GByte required if deploying virtual machine from ISO.
     required: false
     default: null
-    aliases: []
   security_groups:
     description:
       - List of security groups the virtual machine to be applied to.
@@ -107,19 +97,16 @@ options:
       - Name of the project the virtual machine to be created in.
     required: false
     default: null
-    aliases: []
   zone:
     description:
       - Name of the zone in which the virtual machine shoud be created. If not set, default zone is used.
     required: false
     default: null
-    aliases: []
   ssh_key:
     description:
       - Name of the SSH key to be deployed on the new virtual machine.
     required: false
     default: null
-    aliases: []
   affinity_groups:
     description:
       - Affinity groups names to be applied to the new virtual machine.
@@ -131,39 +118,11 @@ options:
       - Optional data (ASCII) that can be sent to the virtual machine upon a successful deployment. The data will be automatically base64 encoded, consider switching to HTTP_POST by using C(CLOUDSTACK_METHOD=post) to increase the HTTP_GET size limit of 2KB to 32 KB.
     required: false
     default: null
-    aliases: []
   poll_async:
     description:
       - Poll async jobs until job has finised.
     required: false
     default: true
-    aliases: []
-  api_key:
-    description:
-      - API key of the CloudStack API.
-    required: false
-    default: null
-    aliases: []
-  api_secret:
-    description:
-      - Secret key of the CloudStack API.
-    required: false
-    default: null
-    aliases: []
-  api_url:
-    description:
-      - URL of the CloudStack API e.g. https://cloud.example.com/client/api.
-    required: false
-    default: null
-    aliases: []
-  api_http_method:
-    description:
-      - HTTP method used.
-    required: false
-    default: 'get'
-    aliases: []
-author: René Moser
-requirements: [ 'python library C(cs)' ]
 '''
 
 EXAMPLES = '''
@@ -171,362 +130,485 @@ EXAMPLES = '''
 # Create a virtual machine on CloudStack from an ISO
 # NOTE: Offering and ISO names depending on the CloudStack configuration.
 - local_action:
-    module: cloudstack_vm
+    module: cs_virtualmachine
     name: web-vm-1
     iso: Linux Debian 7 64-bit
     hypervisor: VMware
     service_offering: 1cpu_1gb
     disk_offering: PerfPlus Storage
     disk_size: '20'
-    api_key: ...
-    api_secret: ...
-    api_url: https://cloud.example.com/client/api
 
 
 # Create a virtual machine on Exoscale Public Cloud
 - local_action:
-    module: cloudstack_vm
+    module: cs_virtualmachine
     name: web-vm-1
     template: Linux Debian 7 64-bit
     service_offering: Tiny
     ssh_key: john@example.com
-    api_key: ...
-    api_secret: ...
-    api_url: https://api.exoscale.ch/compute
   register: vm
 
 - debug: msg='default ip {{ vm.default_ip }} and is in state {{ vm.vm_state }}'
 
 
 # Stop a virtual machine, credentials used in $HOME/.cloudstack.ini
-- local_action: cloudstack_vm name=web-vm-1 state=stopped
+- local_action: cs_virtualmachine name=web-vm-1 state=stopped
 
 
 # Start a virtual machine, credentials used in $HOME/.cloudstack.ini
-- local_action: cloudstack_vm name=web-vm-1 state=started
+- local_action: cs_virtualmachine name=web-vm-1 state=started
 
 
 # Remove a virtual machine, credentials used in $HOME/.cloudstack.ini
-- local_action: cloudstack_vm name=web-vm-1 state=absent
+- local_action: cs_virtualmachine name=web-vm-1 state=absent
 '''
 
-import sys
 import base64
 
 try:
     from cs import CloudStack, CloudStackException, read_config
+    has_lib_cs = True
 except ImportError:
-    print("failed=True " + \
-        "msg='python library cs required: pip install cs'")
-    sys.exit(1)
+    has_lib_cs = False
+
+class AnsibleCloudStack:
+
+    def __init__(self, module):
+        if not has_lib_cs:
+            module.fail_json(msg="python library cs required: pip install cs")
+
+        self.module = module
+        self._connect()
+
+        self.project_id = None
+        self.ip_address_id = None
+        self.zone_id = None
+        self.vm_id = None
+        self.os_type_id = None
+        self.hypervisor = None
 
 
-def get_service_offering_id(module, cs):
-    service_offering = module.params.get('service_offering')
-    service_offerings = cs.listServiceOfferings()
-    if service_offerings:
-        if not service_offering:
-            return service_offerings['serviceoffering'][0]['id']
+    def _connect(self):
+        api_key = self.module.params.get('api_key')
+        api_secret = self.module.params.get('secret_key')
+        api_url = self.module.params.get('api_url')
+        api_http_method = self.module.params.get('api_http_method')
 
-        for s in service_offerings['serviceoffering']:
-            if s['name'] == service_offering or s['id'] == service_offering:
-                return s['id']
-    module.fail_json(msg="Service offering '%s' not found" % service_offering)
-
-
-def get_template_or_iso_id(module, cs):
-    template = module.params.get('template')
-    iso = module.params.get('iso')
-
-    if not template and not iso:
-        module.fail_json(msg="template or iso is required.")
-
-    if template and iso:
-        module.fail_json(msg="template are iso are mutually exclusive.")
-
-    if template:
-        templates = cs.listTemplates(templatefilter='executable')
-        if templates:
-            for t in templates['template']:
-                if t['displaytext'] == template or t['name'] == template or t['id'] == template:
-                    return t['id']
-        module.fail_json(msg="template '%s' not found" % template)
-
-    elif iso:
-        isos = cs.listIsos()
-        if isos:
-            for i in isos['iso']:
-                if i['displaytext'] == iso or i['name'] == iso or i['id'] == iso:
-                    return i['id']
-        module.fail_json(msg="iso '%s' not found" % iso)
+        if api_key and api_secret and api_url:
+            self.cs = CloudStack(
+                endpoint=api_url,
+                key=api_key,
+                secret=api_secret,
+                method=api_http_method
+                )
+        else:
+            self.cs = CloudStack(**read_config())
 
 
-def get_disk_offering_id(module, cs):
-    disk_offering = module.params.get('disk_offering')
+    def get_project_id(self):
+        if self.project_id:
+            return self.project_id
 
-    if not disk_offering:
-        return ''
+        project = self.module.params.get('project')
+        if not project:
+            return None
 
-    disk_offerings = cs.listDiskOfferings()
-    if disk_offerings:
-        for d in disk_offerings['diskoffering']:
-            if d['name'] == disk_offering or d['id'] == disk_offering:
-                return d['id']
-    module.fail_json(msg="disk offering '%s' not found" % disk_offering)
-
-
-def get_project_id(module, cs):
-    project = module.params.get('project')
-    if not project:
-        return ''
-
-    projects = cs.listProjects()
-    if projects:
-        for p in projects['project']:
-            if p['name'] == project or p['displaytext'] == project or p['id'] == project:
-                return p['id']
-    module.fail_json(msg="project '%s' not found" % project)
+        projects = self.cs.listProjects()
+        if projects:
+            for p in projects['project']:
+                if project in [ p['name'], p['displaytext'], p['id'] ]:
+                    self.project_id = p['id']
+                    return self.project_id
+        self.module.fail_json(msg="project '%s' not found" % project)
 
 
-def get_zone_id(module, cs):
-    zone = module.params.get('zone')
-    zones = cs.listZones()
+    def get_ip_address_id(self):
+        if self.ip_address_id:
+            return self.ip_address_id
 
-    if not zone:
-        return zones['zone'][0]['id']
+        ip_address = self.module.params.get('ip_address')
+        if not ip_address:
+            self.module.fail_json(msg="IP address param 'ip_address' is required")
 
-    if zones:
-        for z in zones['zone']:
-            if z['name'] == zone or z['id'] == zone:
-                return z['id']
-    module.fail_json(msg="zone '%s' not found" % zone)
-
-
-def get_hypervisor(module, cs):
-    hypervisor = module.params.get('hypervisor')
-    hypervisors = cs.listHypervisors()
-
-    if not hypervisor:
-        return hypervisors['hypervisor'][0]['name']
-
-    if hypervisors:
-        for h in hypervisors['hypervisor']:
-            if h['name'] == hypervisor:
-                return h['name']
-    module.fail_json(msg="hypervisor '%s' not available" % hypervisor)
-
-
-def get_vm(module, cs, project_id):
-    vm_name = module.params.get('name')
-    vm_display_name = module.params.get('display_name')
-
-    vms = cs.listVirtualMachines(projectid=project_id)
-    if vms:
-        for v in vms['virtualmachine']:
-            if ('name' in v and v['name'] == vm_name) or ('displayname' in v and v['displayname'] == vm_display_name):
-                return v
-    return None
-
-
-def get_network_ids(module, cs, project_id):
-    networks = module.params.get('networks')
-
-    if not networks:
-        return None
-
-    zone_id = get_zone_id(module, cs)
-    if project_id:
-        network_res = cs.listNetworks(projectid=project_id, zoneid=zone_id)
-    else:
-        network_res = cs.listNetworks(zoneid=zone_id)
-
-    network_ids = []
-    if network_res:
-        for n in network_res['network']:
-            if n['name'] in networks or n['id'] in networks:
-                network_ids.append(n['id'])
-    return ','.join(network_ids)
-
-
-def poll_job(cs, job, key):
-    if 'jobid' in job:
-        while True:
-            res = cs.queryAsyncJobResult(jobid=job['jobid'])
-            if res['jobstatus'] != 0:
-                if 'jobresult' in res and key in res['jobresult']:
-                    job = res['jobresult'][key]
-                break
-            time.sleep(2)
-    return job
-
-
-def create_vm(module, cs, result, vm, project_id):
-    if not vm:
         args = {}
-        args['templateid']          = get_template_or_iso_id(module, cs)
-        args['zoneid']              = get_zone_id(module, cs)
-        args['serviceofferingid']   = get_service_offering_id(module, cs)
-        args['projectid']           = project_id
-        args['networkids']          = get_network_ids(module, cs, project_id)
-        args['diskofferingid']      = get_disk_offering_id(module, cs)
-        args['hypervisor']          = get_hypervisor(module, cs)
+        args['ipaddress'] = ip_address
+        args['projectid'] = self.get_project_id()
+        ip_addresses = self.cs.listPublicIpAddresses(**args)
 
-        args['name']                = module.params.get('name')
-        args['group']               = module.params.get('group')
-        args['keypair']             = module.params.get('ssh_key')
-        args['size']                = module.params.get('disk_size')
+        if not ip_addresses:
+            self.module.fail_json(msg="IP address '%s' not found" % args['ipaddress'])
 
-        user_data = module.params.get('user_data')
-        if user_data:
-            args['userdata'] = base64.b64encode(user_data)
-
-        display_name = module.params.get('display_name')
-        if not display_name:
-            display_name = args['name']
-        args['displayname'] = display_name
-
-        security_group_name_list = module.params.get('security_groups')
-        security_group_names = ''
-        if security_group_name_list:
-            security_group_names = ','.join(security_group_name_list)
-        args['securitygroupnames'] = security_group_names
-
-        affinity_group_name_list = module.params.get('affinity_groups')
-        affinity_group_names = ''
-        if affinity_group_name_list:
-            affinity_group_names = ','.join(affinity_group_name_list)
-        args['affinitygroupnames'] = affinity_group_names
-
-        if not module.check_mode:
-            vm = cs.deployVirtualMachine(**args)
-
-            if 'errortext' in vm:
-                module.fail_json(msg="Failed: '%s'" % vm['errortext'])
-
-            poll_async = module.params.get('poll_async')
-            if poll_async:
-                vm = poll_job(cs, vm, 'virtualmachine')
-
-        result['changed'] = True
-    return (result, vm)
+        self.ip_address_id = ip_addresses['publicipaddress'][0]['id']
+        return self.ip_address_id
 
 
-def scale_vm(module, cs, result, vm):
-    if vm:
-        service_offering_id = get_service_offering_id(module, cs)
-        if vm['serviceofferingid'] != service_offering_id:
-            if not module.check_mode:
-                vm_state = vm['state']
-                (result, vm) = stop_vm(module, cs, result, vm)
-                vm = poll_vm_job(vm, cs)
-                cs.scaleVirtualMachine(id=vm['id'], serviceofferingid=service_offering_id)
-                # Start VM again if it ran before the scaling
-                if vm_state == 'Running':
-                    (result, vm) = start_vm(module, cs, result, vm)
-                    vm = poll_job(cs, vm, 'virtualmachine')
-            result['changed'] = True
-    return (result, vm)
+    def get_vm_id(self):
+        if self.vm_id:
+            return self.vm_id
+
+        vm = self.module.params.get('vm')
+        if not vm:
+            self.module.fail_json(msg="Virtual machine param 'vm' is required")
+
+        args = {}
+        args['projectid'] = self.get_project_id()
+        vms = self.cs.listVirtualMachines(**args)
+        if vms:
+            for v in vms['virtualmachine']:
+                if vm in [ v['name'], v['displaytext'] v['id'] ]:
+                    self.vm_id = v['id']
+                    return self.vm_id
+        self.module.fail_json(msg="Virtual machine '%s' not found" % vm)
 
 
-def remove_vm(module, cs, result, vm):
-    if vm:
-        if vm['state'] not in [ 'expunging', 'destroying', 'destroyed' ]:
-            result['changed'] = True
-            if not module.check_mode:
-                res = cs.destroyVirtualMachine(id=vm['id'])
-                if 'errortext' in res:
-                    module.fail_json(msg="Failed: '%s'" % res['errortext'])
+    def get_zone_id(self):
+        if self.zone_id:
+            return self.zone_id
 
-                poll_async = module.params.get('poll_async')
+        zone = self.module.params.get('zone')
+        zones = self.cs.listZones()
+
+        # use the first zone if no zone param given
+        if not zone:
+            self.zone_id = zones['zone'][0]['id']
+            return self.zone_id
+
+        if zones:
+            for z in zones['zone']:
+                if zone in [ z['name'], z['id'] ]:
+                    self.zone_id = z['id']
+                    return self.zone_id
+        self.module.fail_json(msg="zone '%s' not found" % zone)
+
+
+    def get_os_type_id(self):
+        if self.os_type_id:
+            return self.os_type_id
+
+        os_type = self.module.params.get('os_type')
+        if not os_type:
+            return None
+
+        os_types = self.cs.listOsTypes()
+        if os_types:
+            for o in os_types['ostype']:
+                if os_type in [ o['description'], o['id'] ]:
+                    self.os_type_id = o['id']
+                    return self.os_type_id
+        self.module.fail_json(msg="OS type '%s' not found" % os_type)
+
+
+    def get_hypervisor(self):
+        if self.hypervisor:
+            return self.hypervisor
+
+        hypervisor = self.module.params.get('hypervisor')
+        hypervisors = self.cs.listHypervisors()
+
+        # use the first hypervisor if no hypervisor param given
+        if not hypervisor:
+            self.hypervisor = hypervisors['hypervisor'][0]['name']
+            return self.hypervisor
+
+        for h in hypervisors['hypervisor']:
+            if hypervisor.lower() == h['name'].lower():
+                self.hypervisor = h['name']
+                return self.hypervisor
+        self.module.fail_json(msg="Hypervisor '%s' not found" % hypervisor)
+
+
+    def _poll_job(self, job=None, key=None):
+        if 'jobid' in job:
+            while True:
+                res = self.cs.queryAsyncJobResult(jobid=job['jobid'])
+                if res['jobstatus'] != 0 and 'jobresult' in res:
+                    if 'errortext' in res['jobresult']:
+                        self.module.fail_json(msg="Failed: '%s'" % res['jobresult']['errortext'])
+                    if key and key in res['jobresult']:
+                        job = res['jobresult'][key]
+                    break
+                time.sleep(2)
+        return job
+
+
+class AnsibleCloudStackVirtualMachine(AnsibleCloudStack):
+
+    def __init__(self, module):
+        AnsibleCloudStack.__init__(self, module)
+        self.result = {
+            'changed': False,
+        }
+        self.vm = None
+
+
+    def get_service_offering_id(self):
+        service_offering = self.module.params.get('service_offering')
+
+        service_offerings = self.cs.listServiceOfferings()
+        if service_offerings:
+            if not service_offering:
+                return service_offerings['serviceoffering'][0]['id']
+
+            for s in service_offerings['serviceoffering']:
+                if service_offering in [ s['name'], s['id'] ]:
+                    return s['id']
+        self.module.fail_json(msg="Service offering '%s' not found" % service_offering)
+
+
+    def get_template_or_iso_id(self):
+        template = self.module.params.get('template')
+        iso = self.module.params.get('iso')
+
+        if not template and not iso:
+            self.module.fail_json(msg="Template or ISO is required.")
+
+        if template and iso:
+            self.module.fail_json(msg="Template are ISO are mutually exclusive.")
+
+        if template:
+            templates = self.cs.listTemplates(templatefilter='executable')
+            if templates:
+                for t in templates['template']:
+                    if template in [ t['displaytext'], t['name'], t['id'] ]:
+                        return t['id']
+            self.module.fail_json(msg="Template '%s' not found" % template)
+
+        elif iso:
+            isos = self.cs.listIsos()
+            if isos:
+                for i in isos['iso']:
+                    if iso i [ i['displaytext'], i['name'], i['id']:
+                        return i['id']
+            self.module.fail_json(msg="ISO '%s' not found" % iso)
+
+
+    def get_disk_offering_id(self):
+        disk_offering = self.module.params.get('disk_offering')
+
+        if not disk_offering:
+            return None
+
+        disk_offerings = self.cs.listDiskOfferings()
+        if disk_offerings:
+            for d in disk_offerings['diskoffering']:
+                if disk_offering in [ d['name'], d['id'] ]:
+                    return d['id']
+        self.module.fail_json(msg="Disk offering '%s' not found" % disk_offering)
+
+
+
+    def get_vm(self):
+        vm = self.get_vm():
+        if not vm:
+            vm_name = self.module.params.get('name')
+
+            args = {}
+            args['projectid'] = self.get_project_id()
+            vms = self.cs.listVirtualMachines(**args)
+            if vms:
+                for v in vms['virtualmachine']:
+                    if vm_name in [ v['name'], v['displayname'], v['id'] ]:
+                        self.vm = v
+                        break
+        return self.vm
+
+
+    def get_network_ids(self):
+        network_names = self.module.params.get('networks')
+        if not network_names:
+            return None
+
+        args = {}
+        args['zoneid'] = self.get_zone_id()
+        args['projectid'] = self.get_project_id()
+        networks = self.cs.listNetworks(**args)
+
+        network_ids = []
+        if networks:
+            for n in networks['network']:
+                if n['name'] in network_names or n['id'] in network_names:
+                    network_ids.append(n['id'])
+        return network_ids
+
+
+    def create_vm(self):
+        vm = self.get_vm()
+        if not vm:
+            self.result['changed'] = True
+
+            args = {}
+            args['templateid']          = self.get_template_or_iso_id())
+            args['zoneid']              = self.get_zone_id()
+            args['serviceofferingid']   = self.get_service_offering_id()
+            args['projectid']           = self.get_project_id()
+            args['networkids']          = ','.join(self.get_network_ids())
+            args['diskofferingid']      = self.get_disk_offering_id()
+            args['hypervisor']          = self.get_hypervisor()
+
+            args['name']                = self.module.params.get('name')
+            args['group']               = self.module.params.get('group')
+            args['keypair']             = self.module.params.get('ssh_key')
+            args['size']                = self.module.params.get('disk_size')
+
+            user_data = self.module.params.get('user_data')
+            if user_data:
+                args['userdata'] = base64.b64encode(user_data)
+
+            display_name = self.module.params.get('display_name')
+            if not display_name:
+                display_name = args['name']
+            args['displayname'] = display_name
+
+            security_group_name_list = self.module.params.get('security_groups')
+            security_group_names = ''
+            if security_group_name_list:
+                security_group_names = ','.join(security_group_name_list)
+            args['securitygroupnames'] = security_group_names
+
+            affinity_group_name_list = self.module.params.get('affinity_groups')
+            affinity_group_names = ''
+            if affinity_group_name_list:
+                affinity_group_names = ','.join(affinity_group_name_list)
+            args['affinitygroupnames'] = affinity_group_names
+
+            if not self.module.check_mode:
+                vm = self.cs.deployVirtualMachine(**args)
+
+                if 'errortext' in vm:
+                    self.module.fail_json(msg="Failed: '%s'" % vm['errortext'])
+
+                poll_async = self.module.params.get('poll_async')
                 if poll_async:
-                    vm = poll_job(cs, res, 'virtualmachine')
-
-    return (result, vm)
-
-
-def expunge_vm(module, cs, result, vm):
-    if vm:
-        res = {}
-        if vm['state'] in [ 'destroying', 'destroyed' ]:
-            result['changed'] = True
-            if not module.check_mode:
-                res = cs.expungeVirtualMachine(id=vm['id'])
-
-        elif vm['state'] not in [ 'expunging' ]:
-            result['changed'] = True
-            if not module.check_mode:
-                res = cs.destroyVirtualMachine(id=vm['id'], expunge=True)
-
-        if res and 'errortext' in res:
-            module.fail_json(msg="Failed: '%s'" % res['errortext'])
-
-        poll_async = module.params.get('poll_async')
-        if poll_async:
-            vm = poll_job(cs, res, 'virtualmachine')
-
-    return (result, vm)
+                    vm = self._poll_job(vm, 'virtualmachine')
+        return vm
 
 
-def stop_vm(module, cs, result, vm):
-    if not vm:
-        module.fail_json(msg="Virtual machine named '%s' not found" % module.params.get('name'))
+    def scale_vm(self):
+        vm = self.get_vm()
+        if vm:
+            service_offering_id = self.get_service_offering_id()
+            if vm['serviceofferingid'] != service_offering_id:
+                self.result['changed'] = True
+                if not self.module.check_mode:
+                    vm_state = vm['state'].lower()
+                    vm = self.stop_vm()
+                    vm = self._poll_job(vm, 'virtualmachine')
+                    self.cs.scaleVirtualMachine(id=vm['id'], serviceofferingid=service_offering_id)
 
-    if vm['state'] != 'Stopped' and vm['state'] != 'Stopping':
-        if not module.check_mode:
-            vm = cs.stopVirtualMachine(id=vm['id'])
-            if 'errortext' in vm:
-                module.fail_json(msg="Failed: '%s'" % vm['errortext'])
-            poll_async = module.params.get('poll_async')
+                    # Start VM again if it ran before the scaling
+                    if vm_state == 'running':
+                        vm = self.start_vm()
+                        vm = self._poll_job(vm, 'virtualmachine')
+        return vm
+
+
+    def remove_vm(self):
+        vm = self.get_vm()
+        if vm:
+            if vm['state'].lower() not in [ 'expunging', 'destroying', 'destroyed' ]:
+                self.result['changed'] = True
+                if not self.module.check_mode:
+                    res = self.cs.destroyVirtualMachine(id=vm['id'])
+
+                    if 'errortext' in res:
+                        self.module.fail_json(msg="Failed: '%s'" % res['errortext'])
+
+                    poll_async = self.module.params.get('poll_async')
+                    if poll_async:
+                        vm = self._poll_job(res, 'virtualmachine')
+        return vm
+
+
+    def expunge_vm(self):
+        vm = self.get_vm()
+        if vm:
+            res = {}
+            if vm['state'].lower() in [ 'destroying', 'destroyed' ]:
+                self.result['changed'] = True
+                if not self.module.check_mode:
+                    res = self.cs.expungeVirtualMachine(id=vm['id'])
+
+            elif vm['state'].lower() not in [ 'expunging' ]:
+                self.result['changed'] = True
+                if not self.module.check_mode:
+                    res = self.cs.destroyVirtualMachine(id=vm['id'], expunge=True)
+
+            if res and 'errortext' in res:
+                self.module.fail_json(msg="Failed: '%s'" % res['errortext'])
+
+            poll_async = self.module.params.get('poll_async')
             if poll_async:
-                vm = poll_job(cs, vm, 'virtualmachine')
-
-        result['changed'] = True
-    return (result, vm)
+                vm = self._poll_job(res, 'virtualmachine')
+        return vm
 
 
-def start_vm(module, cs, result, vm):
-    if not vm:
-        module.fail_json(msg="Virtual machine named '%s' not found" % module.params.get('name'))
-    if vm['state'] == 'Stopped' or vm['state'] == 'Stopping':
-        if not module.check_mode:
-            vm = cs.startVirtualMachine(id=vm['id'])
-            if 'errortext' in vm:
-                module.fail_json(msg="Failed: '%s'" % vm['errortext'])
-            poll_async = module.params.get('poll_async')
-            if poll_async:
-                vm = poll_job(cs, vm, 'virtualmachine')
+    def stop_vm(self):
+        vm = self.get_vm()
+        if not vm:
+            self.module.fail_json(msg="Virtual machine named '%s' not found" % self.module.params.get('name'))
 
-        result['changed'] = True
-    return (result, vm)
+        if vm['state'].lower() == 'starting' and vm['state'].lower() != 'running':
+            self.result['changed'] = True
+            if not self.module.check_mode:
+                vm = self.cs.stopVirtualMachine(id=vm['id'])
+
+                if 'errortext' in vm:
+                    self.module.fail_json(msg="Failed: '%s'" % vm['errortext'])
+
+                poll_async = self.module.params.get('poll_async')
+                if poll_async:
+                    vm = self._poll_job(vm, 'virtualmachine')
+        return vm
 
 
-def restart_vm(module, cs, result, vm):
-    if not vm:
-        module.fail_json(msg="Virtual machine named '%s' not found" % module.params.get('name'))
-    if vm['state'] == 'Running' or vm['state'] == 'Starting':
-        if not module.check_mode:
-            vm = cs.rebootVirtualMachine(id=vm['id'])
-            poll_async = module.params.get('poll_async')
-            if poll_async:
-                vm = poll_job(cs, vm, 'virtualmachine')
+    def start_vm(self):
+        vm = self.get_vm()
+        if not vm:
+            module.fail_json(msg="Virtual machine named '%s' not found" % module.params.get('name'))
 
-        result['changed'] = True
-    elif vm['state'] == 'Stopping' or vm['state'] == 'Stopped':
-        module.fail_json(msg="Virtual machine named '%s' not running, not restarted" % module.params.get('name'))
-    return (result, vm)
+        if vm['state'].lower() == 'stopped' or vm['state'].lower() == 'stopping':
+            self.result['changed'] = True
+            if not self.module.check_mode:
+                vm = self.cs.startVirtualMachine(id=vm['id'])
+
+                if 'errortext' in vm:
+                    self.module.fail_json(msg="Failed: '%s'" % vm['errortext'])
+
+                poll_async = self.module.params.get('poll_async')
+                if poll_async:
+                    vm = self._poll_job(vm, 'virtualmachine')
+
+        return vm
+
+
+    def restart_vm(self):
+        vm = self.get_vm()
+        if not vm:
+            module.fail_json(msg="Virtual machine named '%s' not found" % self.module.params.get('name'))
+
+        if vm['state'].lower() in [ 'running', 'starting' ]:
+            self.result['changed'] = True
+            if not self.module.check_mode:
+                vm = self.cs.rebootVirtualMachine(id=vm['id'])
+                poll_async = self.module.params.get('poll_async')
+                if poll_async:
+                    vm = self._poll_job(vm, 'virtualmachine')
+
+        elif vm['state'].lower() in [ 'stopping', 'stopped' ]:
+            self.module.fail_json(msg="Virtual machine named '%s' not running, not restarted" % self.module.params.get('name'))
+        return vm
 
 
 def main():
     module = AnsibleModule(
         argument_spec = dict(
-            name = dict(default=None),
-            display_name = dict(default=None),
+            name = dict(required=True),
             group = dict(default=None),
-            state = dict(choices=['created', 'started', 'running', 'booted', 'stopped', 'halted', 'restarted', 'rebooted', 'present', 'absent', 'destroyed', 'expunged'], default='present'),
+            state = dict(choices=['created', 'started', 'stopped', 'restarted', 'present', 'absent', 'destroyed', 'expunged'], default='present'),
             service_offering = dict(default=None),
             template = dict(default=None),
             iso = dict(default=None),
-            networks = dict(type='list', default=None),
+            networks = dict(type='list', aliases= [ 'network' ], default=None),
             disk_offering = dict(default=None),
             disk_size = dict(default=None),
             hypervisor = dict(default=None),
@@ -541,9 +623,6 @@ def main():
             api_secret = dict(default=None),
             api_url = dict(default=None),
             api_http_method = dict(default='get'),
-        ),
-        required_one_of = (
-            ['name', 'display_name'],
         ),
         supports_check_mode=True
     )
