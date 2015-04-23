@@ -222,8 +222,10 @@ class CloudStackInventory(object):
                 if 'group' in host:
                     group_name = host['group']
 
+                #Modify code to show IP addresses instead of VM names
                 if group_name and group_name in data:
-                    data[group_name]['hosts'].append(host_name)
+                    #data[group_name]['hosts'].append(host_name)
+                    data[group_name]['hosts'].append(nic['ipaddress'])
         return data
 
 
